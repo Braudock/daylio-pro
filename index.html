@@ -263,6 +263,10 @@
       const [analysisText, setAnalysisText] = useState('');
       const recognitionRef = useRef(null);
       const textareaRef = useRef(null);
+      // Refs para controle de gravação contínua no mobile
+      const isRecordingRef = useRef(false);      // espelho do state, acessível dentro dos callbacks
+      const cumulativeRef = useRef('');          // acumula o texto entre reinicializações
+      const restartTimerRef = useRef(null);      // debounce do restart
 
       useEffect(() => { saveLogs(logs); }, [logs]);
 
@@ -272,22 +276,82 @@
         setTimeout(() => setToasts(p => p.filter(t => t.id !== id)), 4000);
       };
 
-      // ---- Reconhecimento de voz ----
+      // ---- Reconhecimento de voz com reinício automático (mobile) ----
       useEffect(() => {
         const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (!SR) return;
-        const r = new SR();
-        r.continuous = true; r.interimResults = true; r.lang = 'pt-BR';
-        r.onresult = e => { let t = ''; for (let i = e.resultIndex; i < e.results.length; i++) t += e.results[i][0].transcript; setTranscript(t); };
-        r.onerror = e => { setIsRecording(false); if (e.error !== 'no-speech') setError('Erro ao acessar microfone. Digite abaixo.'); };
-        r.onend = () => setIsRecording(false);
-        recognitionRef.current = r;
+
+        const createRecognition = () => {
+          const r = new SR();
+          r.continuous = true;
+          r.interimResults = true;
+          r.lang = 'pt-BR';
+          r.maxAlternatives = 1;
+
+          r.onresult = (e) => {
+            // Coleta tudo que veio neste evento
+            let sessionText = '';
+            for (let i = 0; i < e.results.length; i++) {
+              sessionText += e.results[i][0].transcript;
+            }
+            // Atualiza o textarea com o acumulado anterior + o atual
+            setTranscript(cumulativeRef.current + sessionText);
+          };
+
+          r.onspeechend = () => {
+            // Captura o que foi dito antes de reiniciar
+            // (o onresult já atualizou o transcript, precisamos salvar no cumulative)
+          };
+
+          r.onend = () => {
+            if (isRecordingRef.current) {
+              // Salva o transcript atual no cumulative antes de reiniciar
+              setTranscript(prev => {
+                cumulativeRef.current = prev;
+                return prev;
+              });
+              // Reinicia após pequeno delay (evita erro no Chrome mobile)
+              restartTimerRef.current = setTimeout(() => {
+                if (isRecordingRef.current && recognitionRef.current) {
+                  try { recognitionRef.current.start(); } catch (_) { }
+                }
+              }, 200);
+            } else {
+              setIsRecording(false);
+            }
+          };
+
+          r.onerror = (e) => {
+            if (e.error === 'no-speech') return; // silencioso — normal no mobile
+            if (e.error === 'aborted') return;   // ignorar aborts de reinício
+            setError('Erro no microfone: ' + e.error + '. Tente novamente.');
+            isRecordingRef.current = false;
+            setIsRecording(false);
+          };
+
+          return r;
+        };
+
+        recognitionRef.current = createRecognition();
       }, []);
 
       const toggleRecording = () => {
-        if (!recognitionRef.current) { setError('Reconhecimento de voz não suportado. Digite abaixo.'); return; }
-        if (isRecording) { recognitionRef.current.stop(); }
-        else { setTranscript(''); setError(''); try { recognitionRef.current.start(); setIsRecording(true); } catch (e) { } }
+        if (!recognitionRef.current) { setError('Reconhecimento de voz não suportado. Use o modo Texto.'); return; }
+        if (isRecordingRef.current) {
+          // Parar gravação explicitamente
+          isRecordingRef.current = false;
+          clearTimeout(restartTimerRef.current);
+          try { recognitionRef.current.stop(); } catch (_) { }
+          setIsRecording(false);
+        } else {
+          // Iniciar gravação
+          cumulativeRef.current = ''; // zera acumulado
+          setTranscript('');
+          setError('');
+          isRecordingRef.current = true;
+          setIsRecording(true);
+          try { recognitionRef.current.start(); } catch (_) { }
+        }
       };
 
       // ---- Processar com IA ou fallback ----
