@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Meu Daylio Pro — Saúde Mental Inteligente</title>
+<meta name="description" content="App de apoio terapêutico com IA companion e dashboard clínico"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+/* ── DESIGN TOKENS ─────────────────────────────────────────── */
+:root {
+  --bg:       #0d0f14;
+  --bg2:      #13161e;
+  --bg3:      #1a1e28;
+  --border:   rgba(255,255,255,0.07);
+  --border2:  rgba(255,255,255,0.12);
+  --sage:     #7eb89a;
+  --sage-dim: rgba(126,184,154,0.15);
+  --lavender: #9b8ec4;
+  --lav-dim:  rgba(155,142,196,0.15);
+  --terracota:#c47b65;
+  --terra-dim:rgba(196,123,101,0.15);
+  --text:     #e8eaf0;
+  --text2:    #9ba3b8;
+  --text3:    #5c6478;
+  --green:    #4caf7d;
+  --yellow:   #e8b84b;
+  --orange:   #e07c3a;
+  --red:      #e05252;
+  --red-dim:  rgba(224,82,82,0.15);
+  --radius:   14px;
+  --radius-sm:8px;
+  --shadow:   0 4px 24px rgba(0,0,0,0.4);
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-track{background:var(--bg2)}
+::-webkit-scrollbar-thumb{background:var(--bg3);border-radius:4px}
+button{cursor:pointer;border:none;font-family:inherit}
+input,textarea{font-family:inherit}
+
+/* ── SCREENS ────────────────────────────────────────────────── */
+.screen{display:none;min-height:100vh}
+.screen.active{display:flex}
+
+/* ── LOGIN ──────────────────────────────────────────────────── */
+#screen-login{flex-direction:column;align-items:center;justify-content:center;padding:32px;background:radial-gradient(ellipse at 30% 20%,rgba(126,184,154,0.08) 0%,transparent 60%),radial-gradient(ellipse at 70% 80%,rgba(155,142,196,0.08) 0%,transparent 60%),var(--bg)}
+.login-logo{display:flex;align-items:center;gap:12px;margin-bottom:8px}
+.login-logo .icon{width:48px;height:48px;background:linear-gradient(135deg,var(--sage),var(--lavender));border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:22px}
+.login-logo h1{font-size:1.5rem;font-weight:700;letter-spacing:-0.5px}
+.login-logo h1 span{color:var(--sage)}
+.login-sub{color:var(--text2);font-size:.875rem;margin-bottom:48px;text-align:center}
+.login-cards{display:flex;gap:16px;flex-wrap:wrap;justify-content:center;max-width:560px;width:100%}
+.profile-card{flex:1;min-width:200px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:28px 24px;display:flex;flex-direction:column;align-items:center;gap:12px;transition:all .25s;position:relative;overflow:hidden}
+.profile-card::before{content:'';position:absolute;inset:0;opacity:0;transition:opacity .3s}
+.profile-card.patient::before{background:linear-gradient(135deg,var(--sage-dim),transparent)}
+.profile-card.therapist::before{background:linear-gradient(135deg,var(--lav-dim),transparent)}
+.profile-card:hover{border-color:var(--border2);transform:translateY(-2px);box-shadow:var(--shadow)}
+.profile-card:hover::before{opacity:1}
+.profile-card .avatar{width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:28px}
+.profile-card.patient .avatar{background:var(--sage-dim)}
+.profile-card.therapist .avatar{background:var(--lav-dim)}
+.profile-card h3{font-size:1rem;font-weight:600}
+.profile-card p{font-size:.8rem;color:var(--text2);text-align:center;line-height:1.5}
+.profile-card .btn-select{margin-top:8px;padding:10px 28px;border-radius:40px;font-size:.85rem;font-weight:500;transition:all .2s}
+.profile-card.patient .btn-select{background:var(--sage);color:#0d1410}
+.profile-card.therapist .btn-select{background:var(--lavender);color:#0d0d14}
+
+/* ── LAYOUT PRINCIPAL ───────────────────────────────────────── */
+#screen-patient,#screen-therapist{flex-direction:column}
+.app-header{background:var(--bg2);border-bottom:1px solid var(--border);padding:0 24px;height:60px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;backdrop-filter:blur(20px)}
+.app-header .logo{display:flex;align-items:center;gap:8px;font-weight:600;font-size:.95rem}
+.app-header .logo .dot{width:8px;height:8px;border-radius:50%;background:var(--sage);animation:pulse 2s infinite}
+.header-right{display:flex;align-items:center;gap:12px}
+.btn-switch{background:var(--bg3);border:1px solid var(--border);color:var(--text2);padding:6px 14px;border-radius:40px;font-size:.78rem;transition:all .2s}
+.btn-switch:hover{border-color:var(--border2);color:var(--text)}
+.app-main{flex:1;padding:24px;max-width:900px;width:100%;margin:0 auto}
+
+/* ── CARDS ──────────────────────────────────────────────────── */
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px}
+.card+.card{margin-top:16px}
+.card-title{font-size:.8rem;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.8px;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+
+/* ── RISK BADGE ─────────────────────────────────────────────── */
+.risk-0{color:var(--green)}
+.risk-1{color:var(--sage)}
+.risk-2{color:var(--yellow)}
+.risk-3{color:var(--orange)}
+.risk-4{color:var(--red)}
+.badge{padding:3px 10px;border-radius:20px;font-size:.72rem;font-weight:600}
+.badge-0{background:rgba(76,175,125,0.15);color:var(--green)}
+.badge-1{background:var(--sage-dim);color:var(--sage)}
+.badge-2{background:rgba(232,184,75,0.15);color:var(--yellow)}
+.badge-3{background:rgba(224,124,58,0.15);color:var(--orange)}
+.badge-4{background:var(--red-dim);color:var(--red)}
+
+/* ── EMOJI MOODS ────────────────────────────────────────────── */
+.mood-grid{display:flex;gap:8px;flex-wrap:wrap}
+.mood-btn{width:52px;height:52px;border-radius:50%;background:var(--bg3);border:2px solid transparent;font-size:1.4rem;display:flex;align-items:center;justify-content:center;transition:all .2s}
+.mood-btn:hover{transform:scale(1.1);border-color:var(--border2)}
+.mood-btn.selected{border-color:var(--sage);background:var(--sage-dim);transform:scale(1.15)}
+
+/* ── BUTTONS ────────────────────────────────────────────────── */
+.btn{padding:11px 22px;border-radius:var(--radius-sm);font-size:.875rem;font-weight:500;transition:all .2s;display:inline-flex;align-items:center;gap:7px}
+.btn-primary{background:linear-gradient(135deg,var(--sage),#5da07c);color:#0d1410}
+.btn-primary:hover{opacity:.9;transform:translateY(-1px)}
+.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text2)}
+.btn-ghost:hover{border-color:var(--border2);color:var(--text);background:var(--bg3)}
+.btn-danger{background:var(--red-dim);border:1px solid rgba(224,82,82,0.3);color:var(--red)}
+.btn-sos{background:linear-gradient(135deg,#c0392b,#e74c3c);color:#fff;width:100%;padding:16px;border-radius:var(--radius);font-size:1rem;font-weight:700;letter-spacing:.5px;box-shadow:0 4px 20px rgba(224,82,82,0.4)}
+.btn-sos:hover{transform:translateY(-2px);box-shadow:0 6px 28px rgba(224,82,82,0.5)}
+
+/* ── TABS ───────────────────────────────────────────────────── */
+.tabs{display:flex;gap:4px;background:var(--bg3);border-radius:var(--radius-sm);padding:4px}
+.tab{flex:1;padding:8px;border-radius:6px;font-size:.82rem;font-weight:500;color:var(--text2);background:transparent;transition:all .2s;text-align:center}
+.tab.active{background:var(--bg2);color:var(--text);box-shadow:0 1px 4px rgba(0,0,0,0.3)}
+
+/* ── INPUT ──────────────────────────────────────────────────── */
+.input-field{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 16px;color:var(--text);font-size:.9rem;outline:none;resize:vertical;transition:border-color .2s}
+.input-field:focus{border-color:var(--sage)}
+.input-field::placeholder{color:var(--text3)}
+
+/* ── TIMELINE ───────────────────────────────────────────────── */
+.timeline{display:flex;flex-direction:column;gap:12px}
+.tl-item{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px;display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:start;transition:border-color .2s}
+.tl-item:hover{border-color:var(--border2)}
+.tl-emoji{font-size:1.8rem;line-height:1}
+.tl-date{font-size:.75rem;color:var(--text3);margin-bottom:4px}
+.tl-text{font-size:.875rem;color:var(--text2);line-height:1.5}
+
+/* ── CHART ──────────────────────────────────────────────────── */
+.chart-wrap{height:120px;display:flex;align-items:flex-end;gap:4px;padding:8px 0}
+.chart-bar{flex:1;border-radius:4px 4px 0 0;min-height:4px;transition:height .5s ease,opacity .2s}
+.chart-bar:hover{opacity:.8}
+
+/* ── SLIDER ─────────────────────────────────────────────────── */
+input[type=range]{width:100%;accent-color:var(--sage);height:6px}
+.slider-labels{display:flex;justify-content:space-between;font-size:.75rem;color:var(--text3);margin-top:4px}
+
+/* ── STREAK ─────────────────────────────────────────────────── */
+.streak-row{display:flex;gap:6px;flex-wrap:wrap}
+.streak-dot{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:600}
+.streak-dot.done{background:var(--sage-dim);color:var(--sage);border:1px solid var(--sage)}
+.streak-dot.missed{background:var(--bg3);color:var(--text3);border:1px solid var(--border)}
+.streak-dot.freeze{background:rgba(232,184,75,0.15);color:var(--yellow);border:1px solid rgba(232,184,75,0.3)}
+
+/* ── EMERGENCY SCREEN ───────────────────────────────────────── */
+#screen-emergency{position:fixed;inset:0;z-index:9999;background:#0d0306;flex-direction:column;align-items:center;justify-content:center;padding:32px;text-align:center;animation:fadeIn .3s ease}
+.emer-title{font-size:1.6rem;font-weight:700;color:#fff;margin-bottom:8px}
+.emer-sub{color:rgba(255,255,255,0.6);margin-bottom:32px;font-size:.9rem;line-height:1.6}
+.emer-btn{display:flex;align-items:center;gap:12px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);border-radius:var(--radius);padding:16px 20px;width:100%;max-width:380px;margin:8px auto;color:#fff;font-size:1rem;font-weight:500;transition:all .2s}
+.emer-btn:hover{background:rgba(255,255,255,0.1);transform:translateX(4px)}
+.emer-btn .emer-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0}
+.emer-cvv .emer-icon{background:rgba(76,175,125,0.2);color:var(--green)}
+.emer-samu .emer-icon{background:rgba(224,82,82,0.2);color:var(--red)}
+.emer-plan .emer-icon{background:rgba(155,142,196,0.2);color:var(--lavender)}
+.emer-back{margin-top:24px;color:rgba(255,255,255,0.4);font-size:.8rem;background:transparent;border:none;text-decoration:underline}
+.emer-pulse{width:80px;height:80px;border-radius:50%;background:rgba(224,82,82,0.15);border:2px solid rgba(224,82,82,0.4);display:flex;align-items:center;justify-content:center;font-size:2.4rem;margin:0 auto 24px;animation:emerpulse 1.5s infinite}
+@keyframes emerpulse{0%,100%{box-shadow:0 0 0 0 rgba(224,82,82,0.4)}50%{box-shadow:0 0 0 16px rgba(224,82,82,0)}}
+
+/* ── AI TYPING ──────────────────────────────────────────────── */
+.ai-bubble{background:var(--bg3);border:1px solid var(--border);border-radius:0 var(--radius) var(--radius) var(--radius);padding:14px 16px;font-size:.875rem;line-height:1.7;color:var(--text);margin-top:12px;position:relative}
+.ai-bubble .ai-label{font-size:.7rem;color:var(--sage);font-weight:600;margin-bottom:6px;display:block}
+.typing span{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--text3);animation:typing .9s infinite;margin:0 2px}
+.typing span:nth-child(2){animation-delay:.15s}
+.typing span:nth-child(3){animation-delay:.3s}
+@keyframes typing{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-6px)}}
+
+/* ── MIC BUTTON ─────────────────────────────────────────────── */
+.mic-btn{width:56px;height:56px;border-radius:50%;background:var(--sage);color:#0d1410;display:flex;align-items:center;justify-content:center;font-size:1.4rem;transition:all .2s;box-shadow:0 4px 16px rgba(126,184,154,0.3)}
+.mic-btn.recording{background:var(--red);box-shadow:0 4px 16px rgba(224,82,82,0.4);animation:micpulse 1s infinite}
+@keyframes micpulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+
+/* ── THERAPIST ──────────────────────────────────────────────── */
+.patient-row{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px;display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;cursor:pointer;transition:all .2s}
+.patient-row:hover{border-color:var(--border2);transform:translateX(2px)}
+.patient-row.urgent{border-left:3px solid var(--red)}
+.patient-row.high{border-left:3px solid var(--orange)}
+.patient-avatar{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,var(--lavender),var(--sage));display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0}
+
+/* ── MISC ───────────────────────────────────────────────────── */
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.fade-in{animation:fadeIn .3s ease both}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.stat-mini{background:var(--bg3);border-radius:var(--radius-sm);padding:14px;text-align:center}
+.stat-mini .num{font-size:1.5rem;font-weight:700;display:block}
+.stat-mini .lbl{font-size:.72rem;color:var(--text2);margin-top:2px;display:block}
+.divider{height:1px;background:var(--border);margin:20px 0}
+.mt-12{margin-top:12px}
+.mt-16{margin-top:16px}
+.tag{display:inline-block;background:var(--bg3);border:1px solid var(--border);border-radius:20px;padding:3px 10px;font-size:.72rem;color:var(--text2);margin:2px}
+.safe-plan-item{background:var(--bg3);border-radius:var(--radius-sm);padding:12px 14px;font-size:.85rem;color:var(--text2);margin-bottom:8px;border-left:3px solid var(--sage)}
+.empty{text-align:center;padding:40px 20px;color:var(--text3);font-size:.875rem}
+.empty .empty-icon{font-size:2.5rem;margin-bottom:12px;display:block}
+@media(max-width:600px){.grid-2{grid-template-columns:1fr}.login-cards{flex-direction:column}.app-main{padding:16px}}
+</style>
+</head>
+<body>
+<!-- screens will be injected by JS -->
+<div id="app"></div>
+<script>
+// ── APP STATE ────────────────────────────────────────────────
+const GEMINI_KEY = localStorage.getItem('mdp_key') || '';
+const state = {
+  view: 'login', // login | patient | therapist | emergency
+  patientName: localStorage.getItem('mdp_name') || 'Luís',
+  mood: null,
+  energy: 5,
+  sleep: 7,
+  text: '',
+  inputMode: 'text', // text | emoji | voice
+  records: JSON.parse(localStorage.getItem('mdp_records') || '[]'),
+  aiResponse: '',
+  aiLoading: false,
+  lastRisk: 0,
+  apiKey: GEMINI_KEY,
+  tab: 'checkin', // checkin | history | stats | safeplan
+  therapistTab: 'inbox', // inbox | patient
+  safePlan: JSON.parse(localStorage.getItem('mdp_safeplan') || 'null') || {
+    signals: ['Isolamento, não responder mensagens', 'Dormir mais de 12h', 'Parar de comer'],
+    calm: ['Respiração 4-7-8', 'Caminhar 10 minutos', 'Ouvir música'],
+    contacts: ['Dra. Aline Chen — WhatsApp', 'CVV — 188 (24h gratuito)', 'Familiar de confiança'],
+    reasons: ['Minha família', 'Projetos que quero terminar', 'Dias bons que ainda virão']
+  },
+  geminiKey: localStorage.getItem('mdp_gemini') || ''
+};
+
+function save() {
+  localStorage.setItem('mdp_records', JSON.stringify(state.records));
+  localStorage.setItem('mdp_name', state.patientName);
+  localStorage.setItem('mdp_safeplan', JSON.stringify(state.safePlan));
+  if(state.geminiKey) localStorage.setItem('mdp_gemini', state.geminiKey);
+}
+
+// ── RENDER ENGINE ────────────────────────────────────────────
+function render() {
+  document.getElementById('app').innerHTML = buildApp();
+  attachEvents();
+}
+
+function buildApp() {
+  return `
+    ${buildLoginScreen()}
+    ${buildPatientScreen()}
+    ${buildTherapistScreen()}
+    ${buildEmergencyScreen()}
+  `;
+}
+</script>
+<script src="daylio-screens.js"></script>
+<script src="daylio-logic.js"></script>
+</body>
+</html>
