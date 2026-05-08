@@ -151,7 +151,7 @@ EM DÚVIDA, escale para o nível MAIOR.
 Se ideacao_suicida=true → risk_level mínimo 3.
 ai_response NUNCA menciona diagnóstico, classificação de risco, ou termos clínicos.`;
 
-  const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${state.geminiKey}`,{
+  const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${state.geminiKey}`,{
     method:'POST',
     headers:{'Content-Type':'application/json'},
     body:JSON.stringify({
