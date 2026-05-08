@@ -56,7 +56,7 @@ input,textarea{font-family:inherit}
 .login-sub{color:var(--text2);font-size:.875rem;margin-bottom:48px;text-align:center}
 .login-cards{display:flex;gap:16px;flex-wrap:wrap;justify-content:center;max-width:560px;width:100%}
 .profile-card{flex:1;min-width:200px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:28px 24px;display:flex;flex-direction:column;align-items:center;gap:12px;transition:all .25s;position:relative;overflow:hidden}
-.profile-card::before{content:'';position:absolute;inset:0;opacity:0;transition:opacity .3s}
+.profile-card::before{content:'';position:absolute;inset:0;opacity:0;transition:opacity .3s;pointer-events:none}
 .profile-card.patient::before{background:linear-gradient(135deg,var(--sage-dim),transparent)}
 .profile-card.therapist::before{background:linear-gradient(135deg,var(--lav-dim),transparent)}
 .profile-card:hover{border-color:var(--border2);transform:translateY(-2px);box-shadow:var(--shadow)}
