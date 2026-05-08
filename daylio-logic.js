@@ -14,6 +14,15 @@ function attachEvents() {
   if(ta) ta.addEventListener('input',e=>state.text=e.target.value);
 }
 
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#039;');
+}
+
 // ── VOICE RECORDING ──────────────────────────────────────────────────────────
 let recognition=null, isRecording=false;
 function toggleMic() {
@@ -69,19 +78,18 @@ async function submitCheckin() {
   if(state.geminiKey&&text) {
     try {
       const analysis=await analyzeWithGemini(text, record);
-      record.risk=analysis.risk_level||0;
+      record.risk=clampRisk(analysis.risk_level);
       record.aiAnalysis=analysis;
-      // Crisis detection
-      if(record.risk>=4){ state.records.push(record); save(); state.aiLoading=false; go('emergency'); return; }
       state.aiResponse=analysis.ai_response||'Obrigado por compartilhar. Seu registro foi salvo.';
     } catch(e) {
-      state.aiResponse='Registro salvo! (IA indisponível: '+e.message+')';
       record.risk=quickRiskEstimate(text);
+      state.aiResponse=getLocalResponse(record.mood, record.risk);
     }
   } else {
     record.risk=quickRiskEstimate(text);
     state.aiResponse=getLocalResponse(record.mood, record.risk);
   }
+  if(record.risk>=4){ state.records.push(record); save(); state.aiLoading=false; go('emergency'); return; }
   state.records.push(record); save();
   state.aiLoading=false; state.mood=null; state.text=''; state.energy=5; state.sleep=7;
   render();
@@ -101,6 +109,12 @@ function quickRiskEstimate(text) {
   return 0;
 }
 
+function clampRisk(value) {
+  const n=Number(value);
+  if(!Number.isFinite(n)) return 0;
+  return Math.max(0,Math.min(4,Math.round(n)));
+}
+
 function getLocalResponse(mood, risk) {
   const responses={
     0: ['Que bom que você está bem! Continue assim. 🌿','Ótimo ouvir isso! Cada dia bem vivido conta muito.'],
@@ -115,9 +129,9 @@ function getLocalResponse(mood, risk) {
 // ── GEMINI API ───────────────────────────────────────────────────────────────
 async function analyzeWithGemini(text, record) {
   const recent=state.records.slice(-5).map(r=>`[${r.date.slice(0,10)}] humor:${r.mood}/4, risco:${r.risk}, texto:"${(r.text||'').slice(0,80)}"`).join('\n');
-  const baseline=state.records.length?Math.round(state.records.reduce((s,r)=>s+(r.mood||2),0)/state.records.length):2;
+  const baseline=state.records.length?Math.round(state.records.reduce((s,r)=>s+(r.mood??2),0)/state.records.length):2;
   const prompt=`Você é um analisador clínico assistente para um app de saúde mental supervisionado pela Dra. Aline Chen (psicóloga).
-Analise o check-in do paciente ${state.patientName} e retorne APENAS um JSON válido sem markdown.
+Analise o check-in do paciente ${state.patientName} e retorne APENAS um JSON válido, curto, sem markdown.
 
 CHECK-IN:
 Texto: "${text}"
@@ -132,11 +146,11 @@ ${recent||'Primeiro registro'}
 RETORNE ESTE JSON EXATO:
 {
   "risk_level": <0-4>,
-  "risk_signals": [<lista de sinais observados>],
+  "risk_signals": [<até 3 sinais observados>],
   "primary_emotions": [<até 3 emoções em português>],
-  "themes": [<temas: trabalho, família, sono, ansiedade, etc>],
+  "themes": [<até 3 temas: trabalho, família, sono, ansiedade, etc>],
   "baseline_deviation": "<abaixo_significativo|abaixo_leve|dentro|acima_leve|acima_significativo>",
-  "ai_response": "<resposta empática em português, 2-3 frases, sem diagnóstico, sem jargão clínico>",
+  "ai_response": "<resposta empática em português, no máximo 240 caracteres, sem diagnóstico, sem jargão clínico>",
   "alert_therapist": <true|false>,
   "crisis_indicators": {
     "ideacao_suicida": <bool>,
@@ -156,7 +170,32 @@ ai_response NUNCA menciona diagnóstico, classificação de risco, ou termos cl�
     headers:{'Content-Type':'application/json'},
     body:JSON.stringify({
       contents:[{parts:[{text:prompt}]}],
-      generationConfig:{temperature:0.2,maxOutputTokens:1024,responseMimeType:"application/json"},
+      generationConfig:{
+        temperature:0.2,
+        maxOutputTokens:2048,
+        responseMimeType:"application/json",
+        responseSchema:{
+          type:"object",
+          properties:{
+            risk_level:{type:"integer"},
+            risk_signals:{type:"array",items:{type:"string"}},
+            primary_emotions:{type:"array",items:{type:"string"}},
+            themes:{type:"array",items:{type:"string"}},
+            baseline_deviation:{type:"string"},
+            ai_response:{type:"string"},
+            alert_therapist:{type:"boolean"},
+            crisis_indicators:{
+              type:"object",
+              properties:{
+                ideacao_suicida:{type:"boolean"},
+                desesperanca_intensa:{type:"boolean"},
+                automutilacao:{type:"boolean"}
+              }
+            }
+          },
+          required:["risk_level","risk_signals","primary_emotions","themes","baseline_deviation","ai_response","alert_therapist","crisis_indicators"]
+        }
+      },
       safetySettings: [
         { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
         { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
@@ -167,9 +206,36 @@ ai_response NUNCA menciona diagnóstico, classificação de risco, ou termos cl�
   });
   if(!res.ok) throw new Error('API erro '+res.status);
   const data=await res.json();
-  const raw=data.candidates?.[0]?.content?.parts?.[0]?.text||'{}';
+  const raw=data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if(!raw) throw new Error('Resposta vazia da IA');
+  return parseGeminiJson(raw);
+}
+
+function parseGeminiJson(raw) {
   const clean=raw.replace(/```json|```/g,'').trim();
-  return JSON.parse(clean);
+  try {
+    return JSON.parse(clean);
+  } catch(e) {
+    const start=clean.indexOf('{');
+    const end=clean.lastIndexOf('}');
+    if(start!==-1&&end>start) {
+      try { return JSON.parse(clean.slice(start,end+1)); } catch(_) {}
+    }
+    const risk=clean.match(/"risk_level"\s*:\s*([0-4])/);
+    if(risk) {
+      return {
+        risk_level:Number(risk[1]),
+        risk_signals:[],
+        primary_emotions:[],
+        themes:[],
+        baseline_deviation:'dentro',
+        ai_response:'Registro salvo. A análise completa não ficou disponível agora, mas seu check-in foi considerado no acompanhamento.',
+        alert_therapist:Number(risk[1])>=3,
+        crisis_indicators:{ideacao_suicida:false,desesperanca_intensa:false,automutilacao:false}
+      };
+    }
+    throw new Error('Resposta incompleta da IA');
+  }
 }
 
 // ── EXPORT / IMPORT ─────────────────────────────────────────────────────────

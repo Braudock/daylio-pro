@@ -7,7 +7,7 @@ function buildLoginScreen() {
     <div class="login-cards">
       <div class="profile-card patient">
         <div class="avatar">🌿</div>
-        <h3>${state.patientName}</h3>
+        <h3>${escapeHtml(state.patientName)}</h3>
         <p>Check-in diário, análise emocional e acompanhamento com IA</p>
         <button class="btn-select" onclick="go('patient')">Entrar como Paciente</button>
       </div>
@@ -20,7 +20,7 @@ function buildLoginScreen() {
     </div>
     <div style="margin-top:32px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px;max-width:400px;width:100%">
       <p style="font-size:.75rem;color:var(--text3);margin-bottom:8px">🔑 Chave Gemini API (opcional)</p>
-      <input id="key-input" class="input-field" placeholder="AIza..." value="${state.geminiKey}" style="font-size:.8rem"/>
+      <input id="key-input" class="input-field" placeholder="AIza..." value="${escapeHtml(state.geminiKey)}" style="font-size:.8rem"/>
       <button onclick="saveKey()" style="margin-top:8px;background:var(--sage-dim);border:1px solid var(--sage);color:var(--sage);padding:6px 16px;border-radius:6px;font-size:.8rem">Salvar</button>
     </div>
   </div>`;
@@ -34,7 +34,7 @@ function buildPatientScreen() {
     <header class="app-header">
       <div class="logo"><div class="dot"></div> MeuDaylio Pro</div>
       <div class="header-right">
-        <span style="font-size:.8rem;color:var(--text2)">👤 ${state.patientName}</span>
+        <span style="font-size:.8rem;color:var(--text2)">👤 ${escapeHtml(state.patientName)}</span>
         <button class="btn-switch" onclick="go('login')">← Trocar</button>
         <button class="btn btn-danger" style="padding:6px 12px;font-size:.75rem" onclick="go('emergency')">🆘 SOS</button>
       </div>
@@ -86,7 +86,7 @@ function buildCheckin(todayDone) {
       <button class="tab ${state.inputMode==='voice'?'active':''}" onclick="state.inputMode='voice';render()" style="flex:none;padding:6px 14px">🎙️ Voz</button>
     </div>
     ${state.inputMode==='text'?`
-      <textarea id="ci-text" class="input-field" rows="4" placeholder="Como foi seu dia? O que está sentindo agora?">${state.text}</textarea>
+      <textarea id="ci-text" class="input-field" rows="4" placeholder="Como foi seu dia? O que está sentindo agora?">${escapeHtml(state.text)}</textarea>
     `:`
       <div style="display:flex;flex-direction:column;align-items:center;gap:12px;padding:20px">
         <button id="mic-btn" class="mic-btn" onclick="toggleMic()">🎙️</button>
@@ -112,7 +112,7 @@ function buildCheckin(todayDone) {
     </button>
     `}
     ${state.aiLoading?`<div class="ai-bubble"><span class="ai-label">🤖 Companion IA</span><div class="typing"><span></span><span></span><span></span></div></div>`:''}
-    ${state.aiResponse&&!state.aiLoading?`<div class="ai-bubble fade-in"><span class="ai-label">🤖 Companion IA</span>${state.aiResponse}</div>`:''}
+    ${state.aiResponse&&!state.aiLoading?`<div class="ai-bubble fade-in"><span class="ai-label">🤖 Companion IA</span>${escapeHtml(state.aiResponse)}</div>`:''}
   </div>`;
 }
 
@@ -125,8 +125,8 @@ function buildHistory() {
       <div class="tl-emoji">${moods[r.mood]||'😐'}</div>
       <div>
         <div class="tl-date">${new Date(r.date).toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'})}</div>
-        <div class="tl-text">${r.text||'(sem texto)'}</div>
-        ${r.aiAnalysis?`<div style="margin-top:8px">${(r.aiAnalysis.themes||[]).map(t=>`<span class="tag">${t}</span>`).join('')}</div>`:''}
+        <div class="tl-text">${escapeHtml(r.text||'(sem texto)')}</div>
+        ${r.aiAnalysis?`<div style="margin-top:8px">${(r.aiAnalysis.themes||[]).map(t=>`<span class="tag">${escapeHtml(t)}</span>`).join('')}</div>`:''}
       </div>
       <span class="badge badge-${r.risk||0}">${['Ótimo','Leve','Atenção','Alto','Crise'][r.risk||0]}</span>
     </div>`).join('')}
@@ -135,15 +135,16 @@ function buildHistory() {
 
 function buildStats() {
   if(state.records.length<2) return `<div class="card"><div class="empty"><span class="empty-icon">📊</span>Registre pelo menos 2 dias para ver estatísticas.</div></div>`;
-  const avg=(arr,key)=>arr.length?Math.round(arr.reduce((s,r)=>s+(r[key]||5),0)/arr.length):0;
+  const avg=(arr,key,fallback=5)=>arr.length?Math.round(arr.reduce((s,r)=>s+(r[key]??fallback),0)/arr.length):0;
   const last7=state.records.slice(-7);
-  const moodAvg=avg(last7,'mood');
+  const moodAvg=avg(last7,'mood',2);
   const energyAvg=avg(last7,'energy');
   const sleepAvg=avg(last7,'sleep');
   const moodColors=['#e05252','#e07c3a','#e8b84b','#7eb89a','#4caf7d'];
   const bars=last7.map(r=>{
-    const h=Math.max(8,((r.mood||2)/4)*100);
-    return `<div class="chart-bar" style="background:${moodColors[r.mood||2]};height:${h}%" title="${new Date(r.date).toLocaleDateString('pt-BR')}"></div>`;
+    const mood=r.mood??2;
+    const h=Math.max(8,(mood/4)*100);
+    return `<div class="chart-bar" style="background:${moodColors[mood]};height:${h}%" title="${new Date(r.date).toLocaleDateString('pt-BR')}"></div>`;
   }).join('');
   return `<div>
     <div class="grid-2">
@@ -171,16 +172,16 @@ function buildSafePlan() {
     <div class="card-title">🛡️ Meu Plano de Segurança</div>
     <p style="font-size:.8rem;color:var(--text2);margin-bottom:16px">Construído com a Dra. Aline Chen. Em momentos difíceis, leia devagar.</p>
     <p style="font-size:.78rem;font-weight:600;color:var(--terracota);margin-bottom:8px">⚠️ Meus sinais de alerta</p>
-    ${sp.signals.map(s=>`<div class="safe-plan-item" style="border-color:var(--terracota)">${s}</div>`).join('')}
+    ${sp.signals.map(s=>`<div class="safe-plan-item" style="border-color:var(--terracota)">${escapeHtml(s)}</div>`).join('')}
     <div class="divider"></div>
     <p style="font-size:.78rem;font-weight:600;color:var(--sage);margin-bottom:8px">🌿 O que me acalma</p>
-    ${sp.calm.map(s=>`<div class="safe-plan-item">${s}</div>`).join('')}
+    ${sp.calm.map(s=>`<div class="safe-plan-item">${escapeHtml(s)}</div>`).join('')}
     <div class="divider"></div>
     <p style="font-size:.78rem;font-weight:600;color:var(--lavender);margin-bottom:8px">📞 Quem posso ligar</p>
-    ${sp.contacts.map(s=>`<div class="safe-plan-item" style="border-color:var(--lavender)">${s}</div>`).join('')}
+    ${sp.contacts.map(s=>`<div class="safe-plan-item" style="border-color:var(--lavender)">${escapeHtml(s)}</div>`).join('')}
     <div class="divider"></div>
     <p style="font-size:.78rem;font-weight:600;color:var(--yellow);margin-bottom:8px">💛 Razões para continuar</p>
-    ${sp.reasons.map(s=>`<div class="safe-plan-item" style="border-color:var(--yellow)">${s}</div>`).join('')}
+    ${sp.reasons.map(s=>`<div class="safe-plan-item" style="border-color:var(--yellow)">${escapeHtml(s)}</div>`).join('')}
     <div class="divider"></div>
     <button class="btn btn-sos" onclick="go('emergency')">🆘 Preciso de ajuda agora</button>
   </div>`;
@@ -224,7 +225,7 @@ function buildTherapistScreen() {
             <div>
               <div style="font-size:.9rem;font-weight:600">${p.name}</div>
               <div style="font-size:.78rem;color:var(--text2);margin-top:2px">${p.note||`${p.records.length} registros · último check-in hoje`}</div>
-              ${p.records.length?`<div style="margin-top:6px">${(p.records[p.records.length-1].aiAnalysis?.themes||[]).slice(0,3).map(t=>`<span class="tag">${t}</span>`).join('')}</div>`:''}
+              ${p.records.length?`<div style="margin-top:6px">${(p.records[p.records.length-1].aiAnalysis?.themes||[]).slice(0,3).map(t=>`<span class="tag">${escapeHtml(t)}</span>`).join('')}</div>`:''}
             </div>
             <span class="badge badge-${p.lastRisk}">${riskLabel[p.lastRisk]}</span>
           </div>
@@ -250,7 +251,7 @@ function buildTherapistScreen() {
 function buildTherapistSummary() {
   if(!state.records.length) return '<p style="color:var(--text3);font-size:.85rem">Sem dados</p>';
   const last7=state.records.slice(-7);
-  const avgMood=last7.reduce((s,r)=>s+(r.mood||2),0)/last7.length;
+  const avgMood=last7.reduce((s,r)=>s+(r.mood??2),0)/last7.length;
   const highRisk=last7.filter(r=>(r.risk||0)>=3).length;
   const themes=[...new Set(last7.flatMap(r=>r.aiAnalysis?.themes||[]))].slice(0,5);
   return `
@@ -259,7 +260,7 @@ function buildTherapistSummary() {
       <div class="stat-mini"><span class="num" style="color:${highRisk>0?'var(--orange)':'var(--green)'}">${highRisk}</span><span class="lbl">Alertas nível 3+</span></div>
     </div>
     <p style="font-size:.78rem;color:var(--text2);margin-bottom:6px">Temas recorrentes:</p>
-    <div>${themes.length?themes.map(t=>`<span class="tag">${t}</span>`).join(''):'<span style="font-size:.8rem;color:var(--text3)">Sem dados suficientes</span>'}</div>
+    <div>${themes.length?themes.map(t=>`<span class="tag">${escapeHtml(t)}</span>`).join(''):'<span style="font-size:.8rem;color:var(--text3)">Sem dados suficientes</span>'}</div>
     <div class="divider"></div>
     <p style="font-size:.8rem;color:var(--text2);line-height:1.6">
       ${last7.length} check-ins nos últimos 7 dias. 
