@@ -41,12 +41,17 @@ function buildPatientScreen() {
       <div class="logo"><div class="dot"></div> MeuDaylio Pro</div>
       <div class="header-right">
         <span style="font-size:.8rem;color:var(--text2)">👤 ${escapeHtml(state.patientName)}</span>
+        <button class="btn-switch" onclick="cycleTheme()">🎨 Tema</button>
         <button class="btn-switch" onclick="go('login')">← Trocar</button>
-        <button class="btn btn-danger" style="padding:6px 12px;font-size:.75rem" onclick="go('emergency')">🆘 SOS</button>
+        <button class="btn btn-danger" style="padding:6px 12px;font-size:.75rem" onclick="requestEmergency()">🆘 SOS</button>
       </div>
     </header>
     <div class="app-main fade-in">
       ${buildStreak()}
+      ${buildPatientInvite()}
+      ${buildSessionAlert()}
+      ${buildTherapistNoteForPatient()}
+      ${buildPatientActivities()}
       ${buildInfoAlerts()}
       <div class="tabs mt-16" style="margin-bottom:16px">
         <button class="tab ${state.tab==='checkin'?'active':''}" onclick="setTab('checkin')">📝 Check-in</button>
@@ -58,6 +63,54 @@ function buildPatientScreen() {
       ${state.tab==='history'?buildHistory():''}
       ${state.tab==='stats'?buildStats():''}
       ${state.tab==='safeplan'?buildSafePlan():''}
+    </div>
+  </div>`;
+}
+
+function buildPatientInvite() {
+  return `<div class="card mt-16">
+    <div class="card-title">🔗 Meu convite</div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <code style="flex:1;background:var(--bg3);border-radius:6px;padding:9px 10px;font-size:.8rem;color:var(--text2)">${escapeHtml(state.inviteCode)}</code>
+      <button class="btn btn-invite" style="padding:8px 12px;font-size:.78rem" onclick="copyInvite()">Copiar</button>
+    </div>
+  </div>`;
+}
+
+function buildSessionAlert() {
+  if(!state.sessionDate) return '';
+  const today=new Date().toISOString().slice(0,10);
+  const isToday=state.sessionDate===today;
+  return `<div class="card mt-16">
+    <div class="card-title">${isToday?'📅 Sessão hoje':'📅 Próxima sessão'}</div>
+    <div class="info-alert" style="${isToday?'border-left-color:var(--terracota);background:var(--terra-dim)':''}">
+      ${isToday?'Hoje é dia de sessão com a Dra. Aline. Leve suas observações e atividades concluídas.':`Sessão agendada para ${new Date(state.sessionDate+'T12:00:00').toLocaleDateString('pt-BR')}.`}
+    </div>
+  </div>`;
+}
+
+function buildTherapistNoteForPatient() {
+  const note=state.therapistNotes.luis;
+  if(!note) return '';
+  return `<div class="card mt-16">
+    <div class="card-title">📝 Observação da Dra. Aline</div>
+    <div class="info-alert">${escapeHtml(note)}</div>
+  </div>`;
+}
+
+function buildPatientActivities() {
+  if(!state.activities.length) return '';
+  const pct=activityEngagement();
+  return `<div class="card mt-16">
+    <div class="card-title">✅ Atividades combinadas</div>
+    <div style="font-size:.78rem;color:var(--text2)">Concluídas: <strong style="color:var(--blue)">${pct}%</strong></div>
+    <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
+    <div class="mt-12">
+      ${state.activities.map(a=>`<div class="activity-row ${a.done?'done':''}">
+        <input type="checkbox" ${a.done?'checked':''} onchange="toggleActivity('${a.id}')"/>
+        <span class="activity-title">${escapeHtml(a.title)}</span>
+        <span class="tag">${a.done?'finalizada':'pendente'}</span>
+      </div>`).join('')}
     </div>
   </div>`;
 }
@@ -213,7 +266,7 @@ function buildSafePlan() {
     <p style="font-size:.78rem;font-weight:600;color:var(--yellow);margin-bottom:8px">💛 Razões para continuar</p>
     ${sp.reasons.map(s=>`<div class="safe-plan-item" style="border-color:var(--yellow)">${escapeHtml(s)}</div>`).join('')}
     <div class="divider"></div>
-    <button class="btn btn-sos" onclick="go('emergency')">🆘 Preciso de ajuda agora</button>
+    <button class="btn btn-sos" onclick="requestEmergency()">🆘 Preciso de ajuda agora</button>
   </div>`;
 }
 
@@ -235,6 +288,19 @@ function makeDemoRecords(days, moodBase, riskBase, themes) {
 }
 
 function getTherapistPatients() {
+  const day=state.demoDay || new Date().toISOString().slice(0,10);
+  const situations=[
+    {text:'Sono irregular e queda de energia',risk:2,themes:['sono','energia','rotina'],mood:2},
+    {text:'Conflito familiar com aumento de ansiedade',risk:2,themes:['família','ansiedade','limites'],mood:1},
+    {text:'Isolamento social e baixa resposta a mensagens',risk:3,themes:['isolamento','rede de apoio','humor'],mood:1},
+    {text:'Boa adesão a autocuidado e caminhada',risk:0,themes:['autocuidado','atividade física','social'],mood:4},
+    {text:'Pressão no trabalho e exaustão',risk:2,themes:['trabalho','cansaço','sono'],mood:2},
+    {text:'Semana estável com melhora de rotina',risk:1,themes:['rotina','sono','organização'],mood:3}
+  ];
+  const ana=seededPick(situations,day+'ana');
+  const carlos=seededPick(situations,day+'carlos');
+  const marina=seededPick(situations,day+'marina');
+  const joao=seededPick(situations,day+'joao');
   return [
     {
       id:'luis',
@@ -249,51 +315,97 @@ function getTherapistPatients() {
       id:'ana',
       name:'Ana S.',
       emoji:'👩',
-      records:makeDemoRecords([0,1,2,4,6,8,10,12],1,3,['sono','isolamento','trabalho']),
-      lastRisk:3,
-      situation:'Queda de humor e isolamento nos últimos dias',
+      records:makeDemoRecords([0,1,2,4,6,8,10,12],ana.mood,ana.risk,ana.themes),
+      lastRisk:ana.risk,
+      situation:ana.text,
       invite:'MDP-ANA24'
     },
     {
       id:'carlos',
       name:'Carlos M.',
       emoji:'🧔',
-      records:makeDemoRecords([0,2,3,5,7,9,11],3,1,['rotina','sono','exercício']),
-      lastRisk:1,
-      situation:'Estável, com melhora gradual de sono',
+      records:makeDemoRecords([0,2,3,5,7,9,11],carlos.mood,carlos.risk,carlos.themes),
+      lastRisk:carlos.risk,
+      situation:carlos.text,
       invite:'MDP-CAR77'
     },
     {
       id:'marina',
       name:'Marina P.',
       emoji:'👩‍💼',
-      records:makeDemoRecords([1,2,5,9],2,2,['família','ansiedade','apetite']),
-      lastRisk:2,
-      situation:'Oscilação ligada a conflitos familiares',
+      records:makeDemoRecords([1,2,5,9],marina.mood,marina.risk,marina.themes),
+      lastRisk:marina.risk,
+      situation:marina.text,
       invite:'MDP-MAR19'
     },
     {
       id:'joao',
       name:'João R.',
       emoji:'👨',
-      records:makeDemoRecords([0,1,3,4,6,7,8,10,11,12,13],4,0,['autocuidado','faculdade','social']),
-      lastRisk:0,
-      situation:'Bom engajamento e humor preservado',
+      records:makeDemoRecords([0,1,3,4,6,7,8,10,11,12,13],joao.mood,joao.risk,joao.themes),
+      lastRisk:joao.risk,
+      situation:joao.text,
       invite:'MDP-JOA52'
     }
   ].map(p=>({...p, engagement:engagementPercent(p.records)}));
+}
+
+function buildTherapistSessionManager() {
+  const today=new Date().toISOString().slice(0,10);
+  return `<div class="card mt-16">
+    <div class="card-title">📅 Sessão do paciente</div>
+    <div class="grid-2">
+      <div>
+        <p style="font-size:.78rem;color:var(--text2);margin-bottom:6px">Data da próxima sessão</p>
+        <input id="session-date" class="input-field" type="date" value="${escapeHtml(state.sessionDate)}"/>
+      </div>
+      <div class="stat-mini">
+        <span class="num" style="color:${state.sessionDate===today?'var(--terracota)':'var(--blue)'}">${state.sessionDate===today?'Hoje':state.sessionDate?'Agendada':'-'}</span>
+        <span class="lbl">Alerta no paciente</span>
+      </div>
+    </div>
+    <button class="btn btn-ghost mt-12" style="padding:8px 14px;font-size:.78rem" onclick="saveSessionDate()">Salvar sessão</button>
+  </div>`;
+}
+
+function buildTherapistActivityManager() {
+  const pct=activityEngagement();
+  return `<div class="card mt-16">
+    <div class="card-title">✅ Atividades prescritas</div>
+    <div class="grid-2">
+      <div>
+        <input id="new-activity-title" class="input-field" placeholder="Ex.: caminhada de 10 min, respiração 4-7-8"/>
+        <button class="btn btn-primary mt-12" style="padding:8px 14px;font-size:.78rem" onclick="addActivity()">Adicionar atividade</button>
+      </div>
+      <div class="stat-mini">
+        <span class="num" style="color:var(--blue)">${pct}%</span>
+        <span class="lbl">Finalizadas pelo paciente</span>
+        <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
+      </div>
+    </div>
+    <div class="mt-12">
+      ${state.activities.length?state.activities.map(a=>`<div class="activity-row ${a.done?'done':''}">
+        <input type="checkbox" ${a.done?'checked':''} onchange="toggleActivity('${a.id}')"/>
+        <span class="activity-title">${escapeHtml(a.title)}</span>
+        <button class="btn btn-ghost" style="padding:6px 10px;font-size:.72rem" onclick="removeActivity('${a.id}')">Remover</button>
+      </div>`).join(''):'<p style="font-size:.82rem;color:var(--text2)">Nenhuma atividade adicionada ainda.</p>'}
+    </div>
+  </div>`;
 }
 
 function buildTherapistScreen() {
   if(state.view!=='therapist') return `<div id="screen-therapist" class="screen"></div>`;
   const allPatients=getTherapistPatients();
   const sorted=[...allPatients].sort((a,b)=>b.lastRisk-a.lastRisk);
+  const openRequests=state.emergencyRequests.filter(r=>r.status!=='resolvido');
+  const highPatients=sorted.filter(p=>p.lastRisk>=3);
   const riskLabel=['Normal','Atenção Leve','Atenção','Risco Alto','CRISE'];
   return `<div id="screen-therapist" class="screen active" style="flex-direction:column">
     <header class="app-header">
       <div class="logo"><div class="dot" style="background:var(--lavender)"></div> Painel Clínico</div>
       <div class="header-right">
         <span style="font-size:.8rem;color:var(--text2)">👩‍⚕️ Dra. Aline Chen</span>
+        <button class="btn-switch" onclick="cycleTheme()">🎨 Tema</button>
         <button class="btn-switch" onclick="go('login')">← Trocar</button>
       </div>
     </header>
@@ -312,8 +424,14 @@ function buildTherapistScreen() {
          <button class="btn btn-invite" style="flex:1;font-size:.8rem" onclick="copyInvite()">
            🔗 Copiar convite de Luís
          </button>
+         <button class="btn btn-primary" style="flex:1;font-size:.8rem;justify-content:center" onclick="generateDailyInfo()">
+           ✨ Gerar dia
+         </button>
          <input type="file" id="import-file" style="display:none" accept=".json" onchange="importData(event)">
       </div>
+
+      ${buildTherapistSessionManager()}
+      ${buildTherapistActivityManager()}
 
       <div class="card mt-16" style="background:var(--blue-dim);border-color:rgba(111,168,220,0.28)">
         <div class="card-title" style="color:var(--blue)">🔔 Alerta informativo</div>
@@ -325,9 +443,14 @@ function buildTherapistScreen() {
       <div class="card mt-16" style="border-color:rgba(224,82,82,0.25)">
         <div class="card-title" style="color:var(--red)">🆘 Seção emergencial</div>
         <div style="display:flex;flex-direction:column;gap:8px">
-          ${sorted.filter(p=>p.lastRisk>=3).map(p=>`<div class="info-alert" style="border-left-color:var(--red);background:var(--red-dim)">
+          ${openRequests.map(r=>`<div class="info-alert" style="border-left-color:var(--red);background:var(--red-dim)">
+            <strong style="color:var(--text)">${escapeHtml(r.patient)}</strong> solicitou apoio · ${new Date(r.date).toLocaleString('pt-BR')}
+            <button class="btn btn-ghost mt-12" style="padding:7px 12px;font-size:.75rem" onclick="resolveEmergency('${r.id}')">Marcar acolhido</button>
+          </div>`).join('')}
+          ${highPatients.map(p=>`<div class="info-alert" style="border-left-color:var(--red);background:var(--red-dim)">
             <strong style="color:var(--text)">${escapeHtml(p.name)}</strong> · ${riskLabel[p.lastRisk]} · ${p.engagement}% de engajamento
-          </div>`).join('')||'<p style="font-size:.82rem;color:var(--text2)">Nenhum paciente em risco alto neste momento.</p>'}
+          </div>`).join('')}
+          ${!openRequests.length&&!highPatients.length?'<p style="font-size:.82rem;color:var(--text2)">Nenhum paciente em risco alto neste momento.</p>':''}
         </div>
       </div>
 

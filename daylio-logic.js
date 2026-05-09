@@ -26,6 +26,61 @@ function copyInvite() {
   }
 }
 
+function cycleTheme() {
+  const themes=['','theme-forest','theme-calm','theme-warm'];
+  const next=themes[(themes.indexOf(state.theme)+1)%themes.length];
+  state.theme=next;
+  save();
+  render();
+}
+
+function addActivity() {
+  const title=document.getElementById('new-activity-title')?.value.trim();
+  if(!title){ alert('Digite uma atividade.'); return; }
+  state.activities.unshift({id:Date.now(),title,done:false,createdAt:new Date().toISOString()});
+  save();
+  render();
+}
+
+function toggleActivity(id) {
+  const item=state.activities.find(a=>String(a.id)===String(id));
+  if(item){ item.done=!item.done; item.doneAt=item.done?new Date().toISOString():''; save(); render(); }
+}
+
+function removeActivity(id) {
+  state.activities=state.activities.filter(a=>String(a.id)!==String(id));
+  save();
+  render();
+}
+
+function requestEmergency() {
+  state.emergencyRequests.unshift({
+    id:Date.now(),
+    patient:'Luís Braud',
+    date:new Date().toISOString(),
+    status:'aberto',
+    message:'Paciente solicitou apoio emergencial pelo aplicativo.'
+  });
+  save();
+  go('emergency');
+}
+
+function resolveEmergency(id) {
+  const req=state.emergencyRequests.find(r=>String(r.id)===String(id));
+  if(req){ req.status='resolvido'; req.resolvedAt=new Date().toISOString(); save(); render(); }
+}
+
+function saveSessionDate() {
+  const el=document.getElementById('session-date');
+  if(el){ state.sessionDate=el.value; save(); render(); }
+}
+
+function generateDailyInfo() {
+  state.demoDay=new Date().toISOString().slice(0,10);
+  save();
+  render();
+}
+
 // ── EVENTS ───────────────────────────────────────────────────────────────────
 function attachEvents() {
   // sync text area
@@ -142,6 +197,18 @@ function engagementPercent(records, days=14) {
     return Number.isFinite(d.getTime()) && ((now-d)/(1000*60*60*24)) < days;
   }).map(r=>r.date.slice(0,10)));
   return Math.min(100,Math.round((recent.size/days)*100));
+}
+
+function activityEngagement() {
+  if(!state.activities.length) return 0;
+  const done=state.activities.filter(a=>a.done).length;
+  return Math.round((done/state.activities.length)*100);
+}
+
+function seededPick(list, seed) {
+  let n=0;
+  for(let i=0;i<seed.length;i++) n=(n*31+seed.charCodeAt(i))%9973;
+  return list[n%list.length];
 }
 
 function getLocalResponse(mood, risk) {

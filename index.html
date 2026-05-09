@@ -35,6 +35,15 @@
   --radius-sm:8px;
   --shadow:   0 4px 24px rgba(0,0,0,0.4);
 }
+body.theme-forest{
+  --bg:#07120d;--bg2:#0f1d16;--bg3:#16281f;--sage:#8bc9a8;--lavender:#8ea6c4;--terracota:#c99665;--blue:#77b8c8;
+}
+body.theme-calm{
+  --bg:#f4f7f5;--bg2:#ffffff;--bg3:#e9efed;--border:rgba(22,34,28,0.1);--border2:rgba(22,34,28,0.18);--text:#18211d;--text2:#52605a;--text3:#7d8883;--shadow:0 4px 18px rgba(21,35,29,0.12);
+}
+body.theme-warm{
+  --bg:#16100d;--bg2:#211812;--bg3:#2c2118;--sage:#9fc08b;--lavender:#c0a2c7;--terracota:#df9874;--blue:#8fb8d8;
+}
 
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
@@ -202,6 +211,9 @@ input[type=range]{width:100%;accent-color:var(--sage);height:6px}
 .progress-fill{height:100%;background:linear-gradient(90deg,var(--sage),var(--blue));border-radius:999px}
 .info-alert{background:var(--blue-dim);border:1px solid rgba(111,168,220,0.28);border-left:3px solid var(--blue);border-radius:var(--radius-sm);padding:12px 14px;font-size:.82rem;color:var(--text2);line-height:1.55}
 .note-box{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;color:var(--text);font-size:.82rem;resize:vertical;width:100%;min-height:72px}
+.activity-row{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;margin-top:8px}
+.activity-row.done{opacity:.68}
+.activity-row.done .activity-title{text-decoration:line-through;color:var(--text3)}
 .empty{text-align:center;padding:40px 20px;color:var(--text3);font-size:.875rem}
 .empty .empty-icon{font-size:2.5rem;margin-bottom:12px;display:block}
 @media(max-width:600px){.grid-2{grid-template-columns:1fr}.login-cards{flex-direction:column}.app-main{padding:16px}}
@@ -231,6 +243,11 @@ const state = {
   inviteCode: localStorage.getItem('mdp_invite') || ('MDP-' + Math.random().toString(36).slice(2,8).toUpperCase()),
   patientObservation: localStorage.getItem('mdp_patient_observation') || '',
   therapistNotes: JSON.parse(localStorage.getItem('mdp_therapist_notes') || '{}'),
+  activities: JSON.parse(localStorage.getItem('mdp_activities') || '[]'),
+  emergencyRequests: JSON.parse(localStorage.getItem('mdp_emergency_requests') || '[]'),
+  sessionDate: localStorage.getItem('mdp_session_date') || '',
+  theme: localStorage.getItem('mdp_theme') || '',
+  demoDay: localStorage.getItem('mdp_demo_day') || '',
   safePlan: JSON.parse(localStorage.getItem('mdp_safeplan') || 'null') || {
     signals: ['Isolamento, não responder mensagens', 'Dormir mais de 12h', 'Parar de comer'],
     calm: ['Respiração 4-7-8', 'Caminhar 10 minutos', 'Ouvir música'],
@@ -246,12 +263,18 @@ function save() {
   localStorage.setItem('mdp_invite', state.inviteCode);
   localStorage.setItem('mdp_patient_observation', state.patientObservation);
   localStorage.setItem('mdp_therapist_notes', JSON.stringify(state.therapistNotes));
+  localStorage.setItem('mdp_activities', JSON.stringify(state.activities));
+  localStorage.setItem('mdp_emergency_requests', JSON.stringify(state.emergencyRequests));
+  localStorage.setItem('mdp_session_date', state.sessionDate);
+  localStorage.setItem('mdp_theme', state.theme);
+  localStorage.setItem('mdp_demo_day', state.demoDay);
   localStorage.setItem('mdp_safeplan', JSON.stringify(state.safePlan));
   if(state.geminiKey) localStorage.setItem('mdp_gemini', state.geminiKey);
 }
 
 // ── RENDER ENGINE ────────────────────────────────────────────
 function render() {
+  document.body.className = state.theme || '';
   document.getElementById('app').innerHTML = buildApp();
   attachEvents();
 }
