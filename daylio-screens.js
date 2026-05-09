@@ -22,6 +22,12 @@ function buildLoginScreen() {
       <p style="font-size:.75rem;color:var(--text3);margin-bottom:8px">🔑 Chave Gemini API (opcional)</p>
       <input id="key-input" class="input-field" placeholder="AIza..." value="${escapeHtml(state.geminiKey)}" style="font-size:.8rem"/>
       <button onclick="saveKey()" style="margin-top:8px;background:var(--sage-dim);border:1px solid var(--sage);color:var(--sage);padding:6px 16px;border-radius:6px;font-size:.8rem">Salvar</button>
+      <div class="divider"></div>
+      <p style="font-size:.75rem;color:var(--text3);margin-bottom:8px">Convite terapêutico</p>
+      <div style="display:flex;gap:8px;align-items:center">
+        <code style="flex:1;background:var(--bg3);border-radius:6px;padding:8px 10px;font-size:.78rem;color:var(--text2)">${escapeHtml(state.inviteCode)}</code>
+        <button class="btn btn-invite" style="padding:8px 12px;font-size:.78rem" onclick="copyInvite()">Copiar</button>
+      </div>
     </div>
   </div>`;
 }
@@ -41,6 +47,7 @@ function buildPatientScreen() {
     </header>
     <div class="app-main fade-in">
       ${buildStreak()}
+      ${buildInfoAlerts()}
       <div class="tabs mt-16" style="margin-bottom:16px">
         <button class="tab ${state.tab==='checkin'?'active':''}" onclick="setTab('checkin')">📝 Check-in</button>
         <button class="tab ${state.tab==='history'?'active':''}" onclick="setTab('history')">📅 Histórico</button>
@@ -52,6 +59,22 @@ function buildPatientScreen() {
       ${state.tab==='stats'?buildStats():''}
       ${state.tab==='safeplan'?buildSafePlan():''}
     </div>
+  </div>`;
+}
+
+function buildInfoAlerts() {
+  const risk=state.records.length ? (state.records[state.records.length-1].risk||0) : 0;
+  const engagement=engagementPercent(state.records);
+  const message=risk>=3
+    ? 'Seu último registro pede atenção. Revise o plano de segurança e procure apoio se o desconforto aumentar.'
+    : engagement<40
+      ? 'Manter alguns check-ins por semana ajuda a Dra. Aline a perceber mudanças de padrão com mais clareza.'
+      : 'Seu acompanhamento está ativo. Continue registrando humor, sono e energia com honestidade.';
+  return `<div class="card mt-16">
+    <div class="card-title">🔔 Alerta informativo</div>
+    <div class="info-alert">${message}</div>
+    <div style="margin-top:12px;font-size:.78rem;color:var(--text2)">Engajamento 14 dias: <strong style="color:var(--blue)">${engagement}%</strong></div>
+    <div class="progress-track"><div class="progress-fill" style="width:${engagement}%"></div></div>
   </div>`;
 }
 
@@ -94,6 +117,12 @@ function buildCheckin(todayDone) {
         <div id="voice-preview" class="ai-bubble" style="width:100%;display:none"></div>
       </div>
     `}
+    <div class="divider"></div>
+    <div style="margin-bottom:16px">
+      <p style="font-size:.78rem;color:var(--text2);margin-bottom:6px">Observação livre para a próxima sessão</p>
+      <textarea id="patient-observation" class="note-box" placeholder="Algo que você quer lembrar de conversar com a Dra. Aline...">${escapeHtml(state.patientObservation)}</textarea>
+      <button class="btn btn-ghost mt-12" style="padding:8px 14px;font-size:.78rem" onclick="savePatientObservation()">Salvar observação</button>
+    </div>
     <div class="divider"></div>
     <div class="grid-2" style="margin-bottom:16px">
       <div>
@@ -140,6 +169,7 @@ function buildStats() {
   const moodAvg=avg(last7,'mood',2);
   const energyAvg=avg(last7,'energy');
   const sleepAvg=avg(last7,'sleep');
+  const engagement=engagementPercent(state.records);
   const moodColors=['#e05252','#e07c3a','#e8b84b','#7eb89a','#4caf7d'];
   const bars=last7.map(r=>{
     const mood=r.mood??2;
@@ -151,7 +181,7 @@ function buildStats() {
       <div class="stat-mini"><span class="num" style="color:var(--sage)">${moodAvg+1}/5</span><span class="lbl">Humor médio (7d)</span></div>
       <div class="stat-mini"><span class="num" style="color:var(--lavender)">${energyAvg}/10</span><span class="lbl">Energia média (7d)</span></div>
       <div class="stat-mini"><span class="num" style="color:var(--terracota)">${sleepAvg}h</span><span class="lbl">Sono médio (7d)</span></div>
-      <div class="stat-mini"><span class="num">${state.records.length}</span><span class="lbl">Total de registros</span></div>
+      <div class="stat-mini"><span class="num" style="color:var(--blue)">${engagement}%</span><span class="lbl">Engajamento (14d)</span></div>
     </div>
     <div class="card mt-12">
       <div class="card-title">📈 Humor — últimos 7 dias</div>
@@ -187,13 +217,76 @@ function buildSafePlan() {
   </div>`;
 }
 
+function makeDemoRecords(days, moodBase, riskBase, themes) {
+  const now=new Date();
+  return days.map((offset,i)=>{
+    const d=new Date(now); d.setDate(d.getDate()-offset);
+    return {
+      id: Number(`${offset}${i}`),
+      date: d.toISOString(),
+      mood: Math.max(0,Math.min(4,moodBase + (i%3===0?-1:i%3===1?0:1))),
+      energy: Math.max(1,Math.min(10,5 + moodBase - riskBase + (i%2))),
+      sleep: Math.max(2,Math.min(12,7 - riskBase + (i%2))),
+      text: themes[0] || 'Registro breve',
+      risk: riskBase,
+      aiAnalysis: { themes }
+    };
+  });
+}
+
+function getTherapistPatients() {
+  return [
+    {
+      id:'luis',
+      name:'Luís Braud',
+      emoji:'🧑',
+      records:state.records,
+      lastRisk:state.records.length?state.records[state.records.length-1].risk||0:0,
+      situation:state.records.length?'Paciente ativo no app':'Aguardando novos registros',
+      invite:state.inviteCode
+    },
+    {
+      id:'ana',
+      name:'Ana S.',
+      emoji:'👩',
+      records:makeDemoRecords([0,1,2,4,6,8,10,12],1,3,['sono','isolamento','trabalho']),
+      lastRisk:3,
+      situation:'Queda de humor e isolamento nos últimos dias',
+      invite:'MDP-ANA24'
+    },
+    {
+      id:'carlos',
+      name:'Carlos M.',
+      emoji:'🧔',
+      records:makeDemoRecords([0,2,3,5,7,9,11],3,1,['rotina','sono','exercício']),
+      lastRisk:1,
+      situation:'Estável, com melhora gradual de sono',
+      invite:'MDP-CAR77'
+    },
+    {
+      id:'marina',
+      name:'Marina P.',
+      emoji:'👩‍💼',
+      records:makeDemoRecords([1,2,5,9],2,2,['família','ansiedade','apetite']),
+      lastRisk:2,
+      situation:'Oscilação ligada a conflitos familiares',
+      invite:'MDP-MAR19'
+    },
+    {
+      id:'joao',
+      name:'João R.',
+      emoji:'👨',
+      records:makeDemoRecords([0,1,3,4,6,7,8,10,11,12,13],4,0,['autocuidado','faculdade','social']),
+      lastRisk:0,
+      situation:'Bom engajamento e humor preservado',
+      invite:'MDP-JOA52'
+    }
+  ].map(p=>({...p, engagement:engagementPercent(p.records)}));
+}
+
 function buildTherapistScreen() {
   if(state.view!=='therapist') return `<div id="screen-therapist" class="screen"></div>`;
-  const allPatients=[
-    {name:'Luís Braud',emoji:'🧑',records:state.records,lastRisk:state.records.length?state.records[state.records.length-1].risk||0:0},
-    {name:'Ana S.',emoji:'👩',records:[],lastRisk:2,note:'Queda de humor há 4 dias'},
-    {name:'Carlos M.',emoji:'🧔',records:[],lastRisk:1,note:'Estável, sono melhorando'},
-  ];
+  const allPatients=getTherapistPatients();
   const sorted=[...allPatients].sort((a,b)=>b.lastRisk-a.lastRisk);
   const riskLabel=['Normal','Atenção Leve','Atenção','Risco Alto','CRISE'];
   return `<div id="screen-therapist" class="screen active" style="flex-direction:column">
@@ -208,13 +301,34 @@ function buildTherapistScreen() {
       <div class="grid-2" style="margin-bottom:16px">
         <div class="stat-mini"><span class="num">${sorted.filter(p=>p.lastRisk>=3).length}</span><span class="lbl">⚠️ Em alerta</span></div>
         <div class="stat-mini"><span class="num">${sorted.length}</span><span class="lbl">👥 Pacientes</span></div>
+        <div class="stat-mini"><span class="num" style="color:var(--blue)">${Math.round(sorted.reduce((s,p)=>s+p.engagement,0)/sorted.length)}%</span><span class="lbl">Engajamento médio</span></div>
+        <div class="stat-mini"><span class="num" style="color:var(--terracota)">${sorted.filter(p=>p.engagement<50).length}</span><span class="lbl">Baixa atividade</span></div>
       </div>
       
       <div style="display:flex;gap:8px;margin-bottom:16px">
          <button class="btn btn-ghost" style="flex:1;font-size:.8rem" onclick="document.getElementById('import-file').click()">
            📥 Importar Paciente (.json)
          </button>
+         <button class="btn btn-invite" style="flex:1;font-size:.8rem" onclick="copyInvite()">
+           🔗 Copiar convite de Luís
+         </button>
          <input type="file" id="import-file" style="display:none" accept=".json" onchange="importData(event)">
+      </div>
+
+      <div class="card mt-16" style="background:var(--blue-dim);border-color:rgba(111,168,220,0.28)">
+        <div class="card-title" style="color:var(--blue)">🔔 Alerta informativo</div>
+        <p style="font-size:.82rem;color:var(--text2);line-height:1.7">
+          Priorize pacientes com risco alto ou engajamento abaixo de 50%. Observações salvas aqui ficam neste navegador e servem como apoio rápido antes da sessão.
+        </p>
+      </div>
+
+      <div class="card mt-16" style="border-color:rgba(224,82,82,0.25)">
+        <div class="card-title" style="color:var(--red)">🆘 Seção emergencial</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          ${sorted.filter(p=>p.lastRisk>=3).map(p=>`<div class="info-alert" style="border-left-color:var(--red);background:var(--red-dim)">
+            <strong style="color:var(--text)">${escapeHtml(p.name)}</strong> · ${riskLabel[p.lastRisk]} · ${p.engagement}% de engajamento
+          </div>`).join('')||'<p style="font-size:.82rem;color:var(--text2)">Nenhum paciente em risco alto neste momento.</p>'}
+        </div>
       </div>
 
       <div class="card-title" style="margin-bottom:12px">📥 Inbox — priorizado por risco</div>
@@ -223,9 +337,13 @@ function buildTherapistScreen() {
           <div class="patient-row ${p.lastRisk===4?'urgent':p.lastRisk===3?'high':''}">
             <div class="patient-avatar">${p.emoji}</div>
             <div>
-              <div style="font-size:.9rem;font-weight:600">${p.name}</div>
-              <div style="font-size:.78rem;color:var(--text2);margin-top:2px">${p.note||`${p.records.length} registros · último check-in hoje`}</div>
+              <div style="font-size:.9rem;font-weight:600">${escapeHtml(p.name)}</div>
+              <div style="font-size:.78rem;color:var(--text2);margin-top:2px">${escapeHtml(p.situation)} · ${p.records.length} registros · convite ${escapeHtml(p.invite)}</div>
+              <div style="margin-top:8px;font-size:.75rem;color:var(--text2)">Atividade: <strong style="color:var(--blue)">${p.engagement}%</strong></div>
+              <div class="progress-track"><div class="progress-fill" style="width:${p.engagement}%"></div></div>
               ${p.records.length?`<div style="margin-top:6px">${(p.records[p.records.length-1].aiAnalysis?.themes||[]).slice(0,3).map(t=>`<span class="tag">${escapeHtml(t)}</span>`).join('')}</div>`:''}
+              <textarea id="note-${p.id}" class="note-box mt-12" placeholder="Observação da terapeuta para este paciente...">${escapeHtml(state.therapistNotes[p.id]||'')}</textarea>
+              <button class="btn btn-ghost mt-12" style="padding:7px 12px;font-size:.75rem" onclick="saveTherapistNote('${p.id}')">Salvar observação</button>
             </div>
             <span class="badge badge-${p.lastRisk}">${riskLabel[p.lastRisk]}</span>
           </div>

@@ -7,6 +7,25 @@ function saveKey() {
   alert('Chave salva!');
 }
 
+function savePatientObservation() {
+  const el=document.getElementById('patient-observation');
+  if(el){ state.patientObservation=el.value.trim(); save(); render(); }
+}
+
+function saveTherapistNote(patientId) {
+  const el=document.getElementById('note-'+patientId);
+  if(el){ state.therapistNotes[patientId]=el.value.trim(); save(); render(); }
+}
+
+function copyInvite() {
+  const text=`Convite MeuDaylio Pro para ${state.patientName}: ${state.inviteCode}`;
+  if(navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(text).then(()=>alert('Convite copiado!')).catch(()=>alert(text));
+  } else {
+    alert(text);
+  }
+}
+
 // ── EVENTS ───────────────────────────────────────────────────────────────────
 function attachEvents() {
   // sync text area
@@ -113,6 +132,16 @@ function clampRisk(value) {
   const n=Number(value);
   if(!Number.isFinite(n)) return 0;
   return Math.max(0,Math.min(4,Math.round(n)));
+}
+
+function engagementPercent(records, days=14) {
+  if(!records?.length) return 0;
+  const now=new Date();
+  const recent=new Set(records.filter(r=>{
+    const d=new Date(r.date);
+    return Number.isFinite(d.getTime()) && ((now-d)/(1000*60*60*24)) < days;
+  }).map(r=>r.date.slice(0,10)));
+  return Math.min(100,Math.round((recent.size/days)*100));
 }
 
 function getLocalResponse(mood, risk) {

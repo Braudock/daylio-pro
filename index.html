@@ -20,6 +20,8 @@
   --lavender: #9b8ec4;
   --lav-dim:  rgba(155,142,196,0.15);
   --terracota:#c47b65;
+  --blue:     #6fa8dc;
+  --blue-dim: rgba(111,168,220,0.14);
   --terra-dim:rgba(196,123,101,0.15);
   --text:     #e8eaf0;
   --text2:    #9ba3b8;
@@ -106,11 +108,12 @@ input,textarea{font-family:inherit}
 
 /* ── BUTTONS ────────────────────────────────────────────────── */
 .btn{padding:11px 22px;border-radius:var(--radius-sm);font-size:.875rem;font-weight:500;transition:all .2s;display:inline-flex;align-items:center;gap:7px}
-.btn-primary{background:linear-gradient(135deg,var(--sage),#5da07c);color:#0d1410}
+.btn-primary{background:linear-gradient(135deg,var(--blue),var(--sage));color:#071016}
 .btn-primary:hover{opacity:.9;transform:translateY(-1px)}
 .btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text2)}
 .btn-ghost:hover{border-color:var(--border2);color:var(--text);background:var(--bg3)}
 .btn-danger{background:var(--red-dim);border:1px solid rgba(224,82,82,0.3);color:var(--red)}
+.btn-invite{background:var(--terra-dim);border:1px solid rgba(196,123,101,0.35);color:var(--terracota)}
 .btn-sos{background:linear-gradient(135deg,#c0392b,#e74c3c);color:#fff;width:100%;padding:16px;border-radius:var(--radius);font-size:1rem;font-weight:700;letter-spacing:.5px;box-shadow:0 4px 20px rgba(224,82,82,0.4)}
 .btn-sos:hover{transform:translateY(-2px);box-shadow:0 6px 28px rgba(224,82,82,0.5)}
 
@@ -195,6 +198,10 @@ input[type=range]{width:100%;accent-color:var(--sage);height:6px}
 .mt-16{margin-top:16px}
 .tag{display:inline-block;background:var(--bg3);border:1px solid var(--border);border-radius:20px;padding:3px 10px;font-size:.72rem;color:var(--text2);margin:2px}
 .safe-plan-item{background:var(--bg3);border-radius:var(--radius-sm);padding:12px 14px;font-size:.85rem;color:var(--text2);margin-bottom:8px;border-left:3px solid var(--sage)}
+.progress-track{height:7px;background:var(--bg3);border-radius:999px;overflow:hidden;margin-top:8px}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--sage),var(--blue));border-radius:999px}
+.info-alert{background:var(--blue-dim);border:1px solid rgba(111,168,220,0.28);border-left:3px solid var(--blue);border-radius:var(--radius-sm);padding:12px 14px;font-size:.82rem;color:var(--text2);line-height:1.55}
+.note-box{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;color:var(--text);font-size:.82rem;resize:vertical;width:100%;min-height:72px}
 .empty{text-align:center;padding:40px 20px;color:var(--text3);font-size:.875rem}
 .empty .empty-icon{font-size:2.5rem;margin-bottom:12px;display:block}
 @media(max-width:600px){.grid-2{grid-template-columns:1fr}.login-cards{flex-direction:column}.app-main{padding:16px}}
@@ -221,6 +228,9 @@ const state = {
   apiKey: GEMINI_KEY,
   tab: 'checkin', // checkin | history | stats | safeplan
   therapistTab: 'inbox', // inbox | patient
+  inviteCode: localStorage.getItem('mdp_invite') || ('MDP-' + Math.random().toString(36).slice(2,8).toUpperCase()),
+  patientObservation: localStorage.getItem('mdp_patient_observation') || '',
+  therapistNotes: JSON.parse(localStorage.getItem('mdp_therapist_notes') || '{}'),
   safePlan: JSON.parse(localStorage.getItem('mdp_safeplan') || 'null') || {
     signals: ['Isolamento, não responder mensagens', 'Dormir mais de 12h', 'Parar de comer'],
     calm: ['Respiração 4-7-8', 'Caminhar 10 minutos', 'Ouvir música'],
@@ -233,6 +243,9 @@ const state = {
 function save() {
   localStorage.setItem('mdp_records', JSON.stringify(state.records));
   localStorage.setItem('mdp_name', state.patientName);
+  localStorage.setItem('mdp_invite', state.inviteCode);
+  localStorage.setItem('mdp_patient_observation', state.patientObservation);
+  localStorage.setItem('mdp_therapist_notes', JSON.stringify(state.therapistNotes));
   localStorage.setItem('mdp_safeplan', JSON.stringify(state.safePlan));
   if(state.geminiKey) localStorage.setItem('mdp_gemini', state.geminiKey);
 }
